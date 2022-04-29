@@ -7,8 +7,8 @@ import config
 
 
 def get_currency_list() -> list:
-    currency_list = ['Российский рубль']
-    response = urllib.request.urlopen("http://cbr.ru/scripts/XML_daily.asp?date_req=22/04/2022")
+    currency_list = [config.RUBLE_SLUG]
+    response = urllib.request.urlopen(config.CBR_URL)
     dom = xml.dom.minidom.parse(response)  # Получение DOM структуры айла
     dom.normalize()
     node_array = dom.getElementsByTagName("ValCurs")  # Получили список объектов валют
@@ -19,6 +19,10 @@ def get_currency_list() -> list:
             for n in data.childNodes:
                 tmp.append(n.childNodes[0].nodeValue)
     return sorted(currency_list) if config.SORT_CURRENCY_LIST else currency_list
+
+
+def convert_currency_input_to_btn() -> None:
+    print(123)
 
 
 def get_data_from_cbr(date):
@@ -36,6 +40,7 @@ def get_data_from_cbr(date):
     print(answer)
 
 
+# http://cbr.ru/scripts/XML_daily.asp?date_req=22/04/2022
 # dom = xml.dom.minidom.parse(response)  # Получение DOM структуры айла
 # dom.normalize()
 # nodeArray = dom.getElementsByTagName("TagName")  # Получение злементов с тегом
@@ -71,7 +76,7 @@ if __name__ == '__main__':
     # Селектор выбора валюты (ИЗ)
     currency_combo_from = ttk.Combobox(tab1, state="readonly")
     currency_combo_from['values'] = get_currency_list()
-    currency_combo_from.current(21 if config.SORT_CURRENCY_LIST else 0)  # В любом случае первая валюта рубль
+    currency_combo_from.current(21 if config.SORT_CURRENCY_LIST else 0)  # В любом случае первая валюта - рубль
     currency_combo_from.grid(column=1, row=1, padx=config.PADX, pady=config.PADY)
 
     # Селектор выбора валюты (В)
@@ -81,6 +86,17 @@ if __name__ == '__main__':
         currency_combo_to.current(random.randint(0, len(currency_combo_to['values']) - 1))
     currency_combo_to.grid(column=1, row=2, padx=config.PADX, pady=config.PADY)
 
+    # Поле ввода
+    currency_input = Entry(tab1)  # Текстовое поле для ввода
+    currency_input.grid(column=2, row=1, padx=config.PADX, pady=config.PADY)
+    currency_input.focus()
+
+    # Кнопка конвертирования
+    currency_input_convert_btn = Button(tab1, text="Конвертировать", command=convert_currency_input_to_btn)
+    currency_input_convert_btn.grid(column=3, row=1, padx=config.PADX, pady=config.PADY)
+
+    convert_error_label = Label(tab1, text="123", fg='red')  # Надпись
+    convert_error_label.grid(column=2, row=2, padx=config.PADX, pady=config.PADY)
     # combo = ttk.Combobox(tab1)  # Создание комбобокса на первой вкладке, можно добавить аргументы, например ширину
     # combo["values"] = ["раз", "два", "три"]
     # print(combo["values"].size())
