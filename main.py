@@ -15,14 +15,46 @@ def get_currency_list() -> list:
     for currency in node_array:  # Перебираем по валютам
         for data in currency.childNodes:
             currency_list.append(data.childNodes[3].childNodes[0].nodeValue)
-            tmp = []
-            for n in data.childNodes:
-                tmp.append(n.childNodes[0].nodeValue)
     return sorted(currency_list) if config.SORT_CURRENCY_LIST else currency_list
 
 
+def get_current_exchange_rate(currency: str) -> float:
+    if currency == config.RUBLE_SLUG:
+        return 1.0
+    response = urllib.request.urlopen(config.CBR_URL)
+    dom = xml.dom.minidom.parse(response)  # Получение DOM структуры айла
+    dom.normalize()
+    node_array = dom.getElementsByTagName("ValCurs")  # Получили список объектов валют
+    for currency_data in node_array:  # Перебираем по валютам
+        for data in currency_data.childNodes:
+            if data.childNodes[3].childNodes[0].nodeValue == currency:
+                return float(data.childNodes[4].childNodes[0].nodeValue.replace(',', '.')) / float(
+                    data.childNodes[2].childNodes[0].nodeValue.replace(',', '.'))
+
+
 def convert_currency_input_to_btn() -> None:
-    print(123)
+    try:
+        value = float(currency_input.get().replace(',', '.'))
+        convert_error_label.configure(fg='black')
+        currency_from, currency_to = currency_combo_from.get(), currency_combo_to.get()
+        if currency_from and currency_to:
+            convert_error_label.configure(
+                text=(1 / get_current_exchange_rate(currency_from)) * get_current_exchange_rate(currency_to) * value)
+            # print(currency_from, '->', currency_to)
+            # print((1 / get_current_exchange_rate(currency_from)) * get_current_exchange_rate(currency_to))
+            # print('======')
+        else:
+            convert_error_label.configure(fg='red')
+            convert_error_label.configure(text=config.NO_END_CURRENCY_SELECTED_ERROR)
+    except ValueError:
+        convert_error_label.configure(fg='red')
+        convert_error_label.configure(text=config.NOT_NUMERIC_VALUE_ERROR)
+    # if value.isdigit():
+    #     convert_error_label.configure(fg='black')
+    # else:
+
+    # sleep(1000)
+    # convert_error_label.configure(fg='black')
 
 
 def get_data_from_cbr(date):
@@ -40,21 +72,6 @@ def get_data_from_cbr(date):
     print(answer)
 
 
-# http://cbr.ru/scripts/XML_daily.asp?date_req=22/04/2022
-# dom = xml.dom.minidom.parse(response)  # Получение DOM структуры айла
-# dom.normalize()
-# nodeArray = dom.getElementsByTagName("TagName")  # Получение злементов с тегом
-# for node in nodeArray:
-# # Получение дочеpниx ³леентв
-# childList = node.childNodes
-# for child in childList:
-#     print(child.nodeName)  # Получение имени узла
-# print(child.childNodes[0].nodeValue)  # Получение значения
-
-def clicked():
-    pass
-
-
 if __name__ == '__main__':
     get_currency_list()
     window = Tk()
@@ -67,11 +84,9 @@ if __name__ == '__main__':
     tab1 = ttk.Frame(tab_control)  # Виджет рамки (вкладка)
     tab2 = ttk.Frame(tab_control)
 
+    # Вкладки приложения
     tab_control.add(tab1, text="Калькулятор валют")
     tab_control.add(tab2, text="Динамика курса")
-
-    # txt = Entry(tab1)  # Текстовое поле для ввода
-    # txt.grid(column=1, row=1)
 
     # Селектор выбора валюты (ИЗ)
     currency_combo_from = ttk.Combobox(tab1, state="readonly")
@@ -87,24 +102,28 @@ if __name__ == '__main__':
     currency_combo_to.grid(column=1, row=2, padx=config.PADX, pady=config.PADY)
 
     # Поле ввода
-    currency_input = Entry(tab1)  # Текстовое поле для ввода
+    entryText = StringVar()
+    currency_input = Entry(tab1, textvariable=entryText)
+    entryText.set("1")
     currency_input.grid(column=2, row=1, padx=config.PADX, pady=config.PADY)
     currency_input.focus()
 
     # Кнопка конвертирования
-    currency_input_convert_btn = Button(tab1, text="Конвертировать", command=convert_currency_input_to_btn)
-    currency_input_convert_btn.grid(column=3, row=1, padx=config.PADX, pady=config.PADY)
+    currency_convert_btn = Button(tab1, text="Конвертировать", command=convert_currency_input_to_btn)
+    currency_convert_btn.grid(column=3, row=1, padx=config.PADX, pady=config.PADY)
 
-    convert_error_label = Label(tab1, text="123", fg='red')  # Надпись
+    # Лайбел вывода конвертации/ошибки
+    convert_error_label = Label(tab1, text="")  # Надпись
     convert_error_label.grid(column=2, row=2, padx=config.PADX, pady=config.PADY)
+
     # combo = ttk.Combobox(tab1)  # Создание комбобокса на первой вкладке, можно добавить аргументы, например ширину
     # combo["values"] = ["раз", "два", "три"]
     # print(combo["values"].size())
     # combo.grid(column=0, row=0)  # Размещение в окне, указана позиция, можно указать отступы
 
-    txt = Entry(tab1)  # Текстовое поле для ввода
-    btn = Button(tab1, text="Действие", command=clicked)  # Кнопка, действие реализуется в функции clicked
-    lb1 = Label(tab1, text="123")  # Надпись
+    # txt = Entry(tab1)  # Текстовое поле для ввода
+    # btn = Button(tab1, text="Действие", command=clicked)  # Кнопка, действие реализуется в функции clicked
+    # lb1 = Label(tab1, text="123")  # Надпись
     # lb1.grid(column=1, row=2)
     # tab_control.add(tab1, txt)
     # Все объекты должны размещаться функцией grid
