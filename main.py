@@ -3,6 +3,8 @@ import tkinter.ttk as ttk
 import urllib.request
 import xml.dom.minidom
 import random
+import matplotlib  # Необходимо установить через PIP
+import matplotlib.pyplot as plt
 import config
 
 
@@ -73,12 +75,16 @@ def get_data_from_cbr(date):
 
 
 if __name__ == '__main__':
-    get_currency_list()
+    """
+    Создание окна и вкладок
+    """
+
     window = Tk()
     # window.option_add("*Font", "courier 8")
     # window.option_add("*Font", "default_font")
     window.title(config.WINDOW_TITLE)
-    window.geometry(config.WINDOW_SIZE)
+    if config.WINDOW_SIZE:
+        window.geometry(config.WINDOW_SIZE)
 
     tab_control = ttk.Notebook(window)  # Виджет управления вкладками
     tab1 = ttk.Frame(tab_control)  # Виджет рамки (вкладка)
@@ -87,6 +93,11 @@ if __name__ == '__main__':
     # Вкладки приложения
     tab_control.add(tab1, text="Калькулятор валют")
     tab_control.add(tab2, text="Динамика курса")
+    tab_control.enable_traversal()
+
+    """
+    Вкладка - Калькулятор валют
+    """
 
     # Селектор выбора валюты (ИЗ)
     currency_combo_from = ttk.Combobox(tab1, state="readonly")
@@ -104,7 +115,8 @@ if __name__ == '__main__':
     # Поле ввода
     entryText = StringVar()
     currency_input = Entry(tab1, textvariable=entryText)
-    entryText.set("1")
+    if config.SET_INITIAL_VALUE:
+        entryText.set(config.SET_INITIAL_VALUE)
     currency_input.grid(column=2, row=1, padx=config.PADX, pady=config.PADY)
     currency_input.focus()
 
@@ -115,6 +127,31 @@ if __name__ == '__main__':
     # Лайбел вывода конвертации/ошибки
     convert_error_label = Label(tab1, text="")  # Надпись
     convert_error_label.grid(column=2, row=2, padx=config.PADX, pady=config.PADY)
+
+    """
+    Вкладка - Динамика курса 
+    """
+
+    # Лайбел 'Валюта'
+    convert_error_label = Label(tab2, text="Валюта", compound=LEFT)
+    convert_error_label.grid(column=1, row=1, padx=config.PADX)
+
+    # Селектор выбора валюты для построения графика
+    currency_combo_graf = ttk.Combobox(tab2, state="readonly")
+    currency_combo_graf['values'] = get_currency_list()
+    currency_combo_graf.current(21 if config.SORT_CURRENCY_LIST else 0)  # В любом случае первая валюта - рубль
+    currency_combo_graf.grid(column=1, row=2, padx=config.PADX, pady=config.PADY)
+
+
+    # matplotlib.use('TkAgg')
+    # fig = plt.figure()
+    # canvas = matplotlib.backends.backend_tkagg.FigureCanvasTkAgg(fig, master=tab2)
+    # plot_widget = canvas.get_tk_widget()
+    # canvas.get_tk_widget()
+    # fig.clear()
+    # plt.plot(100, 100)  # х и у - списки значений абсциссы и ординаты
+    # plt.grid()
+    # plot_widget.grid(row=0, column=0)
 
     # combo = ttk.Combobox(tab1)  # Создание комбобокса на первой вкладке, можно добавить аргументы, например ширину
     # combo["values"] = ["раз", "два", "три"]
