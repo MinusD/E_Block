@@ -83,21 +83,29 @@ def date_to_dot_format(time) -> str:
 def change_selection_period() -> None:
     now = datetime.datetime.now()
     pr = radio_period_state.get()
-    a = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь',
-         'Декабрь']
-    data = []
+    months_slugs = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь',
+                    'Ноябрь',
+                    'Декабрь']
+    quarters_slugs = ['I квартал', 'II квартал', 'III квартал', 'IV квартал']
     delta = datetime.timedelta(days=1)
+    data = []
     if pr == 1:
         now -= 6 * delta
         for i in range(3):
             data.append(str(now.strftime('%d.%m.%Y') + '-' + (now + 6 * delta).strftime('%d.%m.%Y')))
             now -= 7 * delta
     elif pr == 2:
-        print(now.month)
         for i in range(3):
-            data.append(a[now.month % 12 - 1] + ' ' + str(now.year))
-            now -= 30*delta
-
+            data.append(months_slugs[now.month % 12 - 1] + ' ' + str(now.year))
+            now -= 30 * delta
+    elif pr == 3:
+        for i in range(3):
+            data.append(quarters_slugs[(now.month - 1) // 3] + ' ' + str(now.year))
+            now -= 3 * 30 * delta
+    elif pr == 4:
+        for i in range(3):
+            data.append(str(now.year))
+            now -= 365 * delta
     period_combo['values'] = data
     period_combo.current(0)
     # print(datetime)
