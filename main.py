@@ -34,14 +34,14 @@ def get_current_exchange_rate(currency: str = None, date: datetime.datetime = No
     for currency_data in node_array:  # Перебираем по валютам
         for data in currency_data.childNodes:
             if data.childNodes[3].childNodes[0].nodeValue == currency or \
-                    data.childNodes[0].childNodes[0].nodeValue == num_code:
+                    int(data.childNodes[0].childNodes[0].nodeValue) == num_code:
                 # print(float(data.childNodes[4].childNodes[0].nodeValue.replace(',', '.')) / float(
                 #     data.childNodes[2].childNodes[0].nodeValue.replace(',', '.')))
                 return float(data.childNodes[4].childNodes[0].nodeValue.replace(',', '.')) / float(
                     data.childNodes[2].childNodes[0].nodeValue.replace(',', '.'))
 
 
-def get_currency_num_code(currency: str):
+def get_currency_num_code(currency: str) -> int:
     if currency == config.RUBLE_SLUG:
         return 1
     response = urllib.request.urlopen(config.CBR_URL)
@@ -51,7 +51,7 @@ def get_currency_num_code(currency: str):
     for currency_data in node_array:  # Перебираем по валютам
         for data in currency_data.childNodes:
             if data.childNodes[3].childNodes[0].nodeValue == currency:
-                return data.childNodes[0].childNodes[0].nodeValue
+                return int(data.childNodes[0].childNodes[0].nodeValue)
 
 
 def convert_currency_input_to_btn() -> None:
@@ -139,8 +139,8 @@ def next_load_indicator() -> None:
 
 def end_load_indicator() -> None:
     for i in range(config.NUMBER_OF_POINTS_IN_INDICATOR):
-        loader_canvas.itemconfigure(loader_data[i], fill='green')
-        loader_canvas.itemconfigure(loader_data[i], outline='green')
+        loader_canvas.itemconfigure(loader_data[i], fill='lightgreen')
+        loader_canvas.itemconfigure(loader_data[i], outline='lightgreen')
     tab2.update()
 
 
