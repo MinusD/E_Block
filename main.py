@@ -7,6 +7,7 @@ import datetime
 import re
 import matplotlib
 import matplotlib.pyplot as plt
+from calendar import monthrange
 import config
 
 
@@ -22,16 +23,19 @@ def get_currency_list(with_ruble: bool = True) -> list:
     return sorted(currency_list) if config.SORT_CURRENCY_LIST else currency_list
 
 
-def get_current_exchange_rate(currency: str) -> float:
+def get_current_exchange_rate(currency: str, date: datetime.datetime = None) -> float:
     if currency == config.RUBLE_SLUG:
         return 1.0
-    response = urllib.request.urlopen(config.CBR_URL)
+    response = urllib.request.urlopen(config.CBR_URL + (f'?date_req={str(date.strftime("%d/%m/%Y"))}' if date else ''))
+    print(f'?date_req={str(date.strftime("%d/%m/%Y"))}' if date else '')
     dom = xml.dom.minidom.parse(response)  # Получение DOM структуры айла
     dom.normalize()
     node_array = dom.getElementsByTagName("ValCurs")  # Получили список объектов валют
     for currency_data in node_array:  # Перебираем по валютам
         for data in currency_data.childNodes:
             if data.childNodes[3].childNodes[0].nodeValue == currency:
+                print(float(data.childNodes[4].childNodes[0].nodeValue.replace(',', '.')) / float(
+                    data.childNodes[2].childNodes[0].nodeValue.replace(',', '.')))
                 return float(data.childNodes[4].childNodes[0].nodeValue.replace(',', '.')) / float(
                     data.childNodes[2].childNodes[0].nodeValue.replace(',', '.'))
 
@@ -58,7 +62,6 @@ def convert_currency_input_to_btn() -> None:
 
 def get_data_from_cbr(date):
     answer = []
-
     response = urllib.request.urlopen("http://cbr.ru/scripts/XML_daily.asp")
     dom = xml.dom.minidom.parse(response)  # Получение DOM структуры айла
     dom.normalize()
@@ -72,38 +75,27 @@ def get_data_from_cbr(date):
     print(answer)
 
 
-def draw_currency_graph() -> None:
-    pass
-
-
-def date_to_dot_format(time) -> str:
-    return str(time.day) + '.' + str(time.month) + '.' + str(time.year)
-
-
 def change_selection_period() -> None:
     now = datetime.datetime.now()
     pr = radio_period_state.get()
-    months_slugs = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь',
-                    'Ноябрь',
-                    'Декабрь']
-    quarters_slugs = ['I квартал', 'II квартал', 'III квартал', 'IV квартал']
+
     delta = datetime.timedelta(days=1)
     data = []
     if pr == 1:
         now -= 6 * delta
-        for i in range(3):
+        for i in range(config.NUMBER_OF_PERIODS):
             data.append(str(now.strftime('%d.%m.%Y') + '-' + (now + 6 * delta).strftime('%d.%m.%Y')))
             now -= 7 * delta
     elif pr == 2:
-        for i in range(3):
-            data.append(months_slugs[now.month % 12 - 1] + ' ' + str(now.year))
+        for i in range(config.NUMBER_OF_PERIODS):
+            data.append(config.MONTHS_SLUGS[now.month % 12 - 1] + ' ' + str(now.year))
             now -= 30 * delta
     elif pr == 3:
-        for i in range(3):
-            data.append(quarters_slugs[(now.month - 1) // 3] + ' ' + str(now.year))
+        for i in range(config.NUMBER_OF_PERIODS):
+            data.append(config.QUARTERS_SLUGS[(now.month - 1) // 3] + ' ' + str(now.year))
             now -= 3 * 30 * delta
     elif pr == 4:
-        for i in range(3):
+        for i in range(config.NUMBER_OF_PERIODS):
             data.append(str(now.year))
             now -= 365 * delta
     period_combo['values'] = data
@@ -111,6 +103,76 @@ def change_selection_period() -> None:
     # print(datetime)
     # print(datetime.date.today())
     # print(radio_period_state.get())
+
+
+def get_number_of_days_in_month(date: datetime.datetime) -> int:
+    return monthrange(date.year, month=date.month)[1]
+
+
+def draw_currency_graph() -> None:
+    # Очищаем и подготовляем график
+    plt.close()
+    fig = plt.figure()
+    canvas = matplotlib.backends.backend_tkagg.FigureCanvasTkAgg(fig, master=tab2)
+    plot_widget = canvas.get_tk_widget()
+    canvas.get_tk_widget()
+    fig.clear()
+
+    # Получаем данные для построения
+    now = datetime.datetime.now()
+    pr = radio_period_state.get()
+    num_of_period = period_combo.current()
+    delta = datetime.timedelta(days=1)
+    num_of_points: int = 0
+    labels: [str] = []
+    x = []
+    y = []
+
+    if pr == 1:
+        now -= (num_of_period + 1) * 7 * delta - delta
+        num_of_points = 7
+        for i in range(num_of_points):
+            x.append(i)
+            y.append(get_current_exchange_rate(currency_combo_graf.get(), now))
+            labels.append(str(now.strftime('%d.%m.%Y')) if not i % 2 else '')
+            now += delta
+        print()
+    elif pr == 2:
+        num_of_points = get_number_of_days_in_month(now)
+        now -= (now.day - 1) * delta
+        for i in range(num_of_period):
+            now -= delta
+            num_of_points = get_number_of_days_in_month(now)
+            now -= (num_of_points - 1) * delta
+        for i in range(num_of_points):
+            x.append(i)
+            y.append(get_current_exchange_rate(currency_combo_graf.get(), now))
+            # labels.append(str(now.day))
+            labels.append(str(now.day) if i < 9 or not i % 2 else '')
+            now += delta
+
+    plt.plot(x, y)
+    plt.xticks(range(num_of_points), labels)
+    # elif pr == 2:
+    #     for i in range(3):
+    #         data.append(config.MONTHS_SLUGS[now.month % 12 - 1] + ' ' + str(now.year))
+    #         now -= 30 * delta
+    # elif pr == 3:
+    #     for i in range(3):
+    #         data.append(config.QUARTERS_SLUGS[(now.month - 1) // 3] + ' ' + str(now.year))
+    #         now -= 3 * 30 * delta
+    # elif pr == 4:
+    #     for i in range(3):
+    #         data.append(str(now.year))
+    #         now -= 365 * delta
+
+    # labels = ['Top10', 'Top9', 'Top8', 'Top7', 'Top6', 'Top5', 'Top4', 'Top3', 'Top2', 'Top1']
+
+    # print([(param, value) for param, value in plt.rcParams.items() if 'color' in param])
+    # y = [257034, 260972, 343206, 362693, 413886, 521024, 670460, 722834, 748542, 1217913]
+    plt.grid()
+    plot_widget.grid(column=4, row=6)
+    pass
 
 
 if __name__ == '__main__':
@@ -189,7 +251,7 @@ if __name__ == '__main__':
     currency_combo_graf = ttk.Combobox(tab2, state="readonly")
     currency_combo_graf['values'] = get_currency_list(False)
     currency_combo_graf.current(
-        random.randint(0, len(currency_combo_to['values']) - 1) if config.RANDOM_CURRENCY else 0)
+        random.randint(0, len(currency_combo_to['values']) - 2) if config.RANDOM_CURRENCY else 0)
     currency_combo_graf.grid(column=1, row=2, padx=config.PADX, pady=config.PADY)
 
     # Селектор выбора валюты для построения графика
@@ -215,15 +277,21 @@ if __name__ == '__main__':
     radio_period_3.grid(column=2, row=4)
     radio_period_4.grid(column=2, row=5)
 
-    # matplotlib.use('TkAgg')
+    # Кнопка построения графика
+    draw_currency_graph_btn = Button(tab2, text="Построить график", command=draw_currency_graph)
+    draw_currency_graph_btn.grid(column=1, row=3, padx=config.PADX, pady=config.PADY)
+
+    matplotlib.use('TkAgg')
+
     # fig = plt.figure()
     # canvas = matplotlib.backends.backend_tkagg.FigureCanvasTkAgg(fig, master=tab2)
     # plot_widget = canvas.get_tk_widget()
     # canvas.get_tk_widget()
     # fig.clear()
-    # plt.plot(100, 100)  # х и у - списки значений абсциссы и ординаты
+    # plt.plot([random.randint(0, 30) for i in range(10)],
+    #          [random.randint(0, 30) for i in range(10)])  # х и у - списки значений абсциссы и ординаты
     # plt.grid()
-    # plot_widget.grid(row=0, column=0)
+    # plot_widget.grid(column=4, row=6)
 
     # combo = ttk.Combobox(tab1)  # Создание комбобокса на первой вкладке, можно добавить аргументы, например ширину
     # combo["values"] = ["раз", "два", "три"]
