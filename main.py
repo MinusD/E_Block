@@ -23,7 +23,7 @@ def get_currency_list(with_ruble: bool = True) -> list:
     return sorted(currency_list) if config.SORT_CURRENCY_LIST else currency_list
 
 
-def get_current_exchange_rate(currency: str, date: datetime.datetime = None) -> float:
+def get_current_exchange_rate(currency: str = None, date: datetime.datetime = None, num_code: int = None) -> float:
     if currency == config.RUBLE_SLUG:
         return 1.0
     response = urllib.request.urlopen(config.CBR_URL + (f'?date_req={str(date.strftime("%d/%m/%Y"))}' if date else ''))
@@ -33,11 +33,25 @@ def get_current_exchange_rate(currency: str, date: datetime.datetime = None) -> 
     node_array = dom.getElementsByTagName("ValCurs")  # Получили список объектов валют
     for currency_data in node_array:  # Перебираем по валютам
         for data in currency_data.childNodes:
-            if data.childNodes[3].childNodes[0].nodeValue == currency:
+            if data.childNodes[3].childNodes[0].nodeValue == currency or \
+                    data.childNodes[0].childNodes[0].nodeValue == num_code:
                 print(float(data.childNodes[4].childNodes[0].nodeValue.replace(',', '.')) / float(
                     data.childNodes[2].childNodes[0].nodeValue.replace(',', '.')))
                 return float(data.childNodes[4].childNodes[0].nodeValue.replace(',', '.')) / float(
                     data.childNodes[2].childNodes[0].nodeValue.replace(',', '.'))
+
+
+def get_currency_num_code(currency: str):
+    if currency == config.RUBLE_SLUG:
+        return 1
+    response = urllib.request.urlopen(config.CBR_URL)
+    dom = xml.dom.minidom.parse(response)  # Получение DOM структуры айла
+    dom.normalize()
+    node_array = dom.getElementsByTagName("ValCurs")  # Получили список объектов валют
+    for currency_data in node_array:  # Перебираем по валютам
+        for data in currency_data.childNodes:
+            if data.childNodes[3].childNodes[0].nodeValue == currency:
+                return data.childNodes[0].childNodes[0].nodeValue
 
 
 def convert_currency_input_to_btn() -> None:
@@ -110,6 +124,7 @@ def get_month_slug(date: datetime.datetime) -> str:
     return config.MONTHS_SLUGS[date.month % 12 - 1]
 
 
+# Возвращает количество дней в месяце
 def get_number_of_days_in_month(date: datetime.datetime) -> int:
     return monthrange(date.year, month=date.month)[1]
 
@@ -143,6 +158,7 @@ def draw_currency_graph() -> None:
     pr = radio_period_state.get()
     num_of_period = period_combo.current()
     delta = datetime.timedelta(days=1)
+    currency_num_code = get_currency_num_code(currency_combo_graf.get())
     now_day = now.day
     num_of_points: int = 0
     labels: [str] = []
@@ -153,7 +169,7 @@ def draw_currency_graph() -> None:
         num_of_points = 7
         for i in range(num_of_points):
             x.append(i)
-            y.append(get_current_exchange_rate(currency_combo_graf.get(), now))
+            y.append(get_current_exchange_rate(date=now, num_code=currency_num_code))
             labels.append(str(now.strftime('%d.%m.%Y')) if not i % 2 else '')
             now += delta
         print()
@@ -169,7 +185,7 @@ def draw_currency_graph() -> None:
         for i in range(num_of_points):
             if i < now_day or config.IGNORE_NON_COMING_DAYS:
                 x.append(i)
-                y.append(get_current_exchange_rate(currency_combo_graf.get(), now))
+                y.append(get_current_exchange_rate(date=now, num_code=currency_num_code))
             labels.append(str(now.day) if i < 9 or not i % 2 else '')
             now += delta
         print()
@@ -183,33 +199,19 @@ def draw_currency_graph() -> None:
                 if not i % 4:
                     num_of_points += 1
                     x.append(i // 4 + num_of_points_l_t)
-                    y.append(get_current_exchange_rate(currency_combo_graf.get(), now))  # Курс
-                    labels.append(get_month_slug(now) if i == 0 else (str(now.day) if 7 < i < 28 and not i % 2  else ''))
+                    y.append(get_current_exchange_rate(date=now, num_code=currency_num_code))  # Курс
+                    labels.append(
+                        get_month_slug(now)[:3] if i == 0 else (str(now.day) if 5 < i < 28 and not i % 2 else ''))
                 now += delta
             num_of_points_l_t = num_of_points  # Для подcчета последующих координат
+    elif pr == 4:
+        now -= num_of_period * 365 * delta  # Попадаем в нужный год
 
+        pass
     plt.plot(x, y)
     plt.xticks(range(num_of_points), labels)
-    # elif pr == 2:
-    #     for i in range(3):
-    #         data.append(config.MONTHS_SLUGS[now.month % 12 - 1] + ' ' + str(now.year))
-    #         now -= 30 * delta
-    # elif pr == 3:
-    #     for i in range(3):
-    #         data.append(config.QUARTERS_SLUGS[(now.month - 1) // 3] + ' ' + str(now.year))
-    #         now -= 3 * 30 * delta
-    # elif pr == 4:
-    #     for i in range(3):
-    #         data.append(str(now.year))
-    #         now -= 365 * delta
-
-    # labels = ['Top10', 'Top9', 'Top8', 'Top7', 'Top6', 'Top5', 'Top4', 'Top3', 'Top2', 'Top1']
-
-    # print([(param, value) for param, value in plt.rcParams.items() if 'color' in param])
-    # y = [257034, 260972, 343206, 362693, 413886, 521024, 670460, 722834, 748542, 1217913]
     plt.grid()
     plot_widget.grid(column=4, row=6)
-    pass
 
 
 if __name__ == '__main__':
@@ -321,5 +323,5 @@ if __name__ == '__main__':
     # Настраиваем способ отрисовки графика
     matplotlib.use('TkAgg')
 
-    tab_control.pack(expand=1, fill='both')  # Открытие первой вкладки
-    window.mainloop()  # Запуск главного цикла обработки событий
+    tab_control.pack(expand=1, fill='both')  # Открываем первую вкладку
+    window.mainloop()
