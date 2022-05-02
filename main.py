@@ -27,7 +27,7 @@ def get_current_exchange_rate(currency: str = None, date: datetime.datetime = No
     if currency == config.RUBLE_SLUG:
         return 1.0
     response = urllib.request.urlopen(config.CBR_URL + (f'?date_req={str(date.strftime("%d/%m/%Y"))}' if date else ''))
-    print(f'?date_req={str(date.strftime("%d/%m/%Y"))}' if date else '')
+    # print(f'?date_req={str(date.strftime("%d/%m/%Y"))}' if date else '')
     dom = xml.dom.minidom.parse(response)  # Получение DOM структуры айла
     dom.normalize()
     node_array = dom.getElementsByTagName("ValCurs")  # Получили список объектов валют
@@ -35,8 +35,8 @@ def get_current_exchange_rate(currency: str = None, date: datetime.datetime = No
         for data in currency_data.childNodes:
             if data.childNodes[3].childNodes[0].nodeValue == currency or \
                     data.childNodes[0].childNodes[0].nodeValue == num_code:
-                print(float(data.childNodes[4].childNodes[0].nodeValue.replace(',', '.')) / float(
-                    data.childNodes[2].childNodes[0].nodeValue.replace(',', '.')))
+                # print(float(data.childNodes[4].childNodes[0].nodeValue.replace(',', '.')) / float(
+                #     data.childNodes[2].childNodes[0].nodeValue.replace(',', '.')))
                 return float(data.childNodes[4].childNodes[0].nodeValue.replace(',', '.')) / float(
                     data.childNodes[2].childNodes[0].nodeValue.replace(',', '.'))
 
@@ -74,27 +74,12 @@ def convert_currency_input_to_btn() -> None:
         convert_out_label.configure(text=config.NOT_NUMERIC_VALUE_ERROR)
 
 
-def get_data_from_cbr(date):
-    answer = []
-    response = urllib.request.urlopen("http://cbr.ru/scripts/XML_daily.asp")
-    dom = xml.dom.minidom.parse(response)  # Получение DOM структуры айла
-    dom.normalize()
-    node_array = dom.getElementsByTagName("ValCurs")  # Получили список объектов валют
-    for currency in node_array:  # Перебираем по валютам
-        for data in currency.childNodes:
-            tmp = []
-            for n in data.childNodes:
-                tmp.append(n.childNodes[0].nodeValue)
-            answer.append(tmp)
-    print(answer)
-
-
 def change_selection_period() -> None:
     now = datetime.datetime.now()
     pr = radio_period_state.get()
-
     delta = datetime.timedelta(days=1)
     data = []
+
     if pr == 1:
         now -= 6 * delta
         for i in range(config.NUMBER_OF_PERIODS):
@@ -114,9 +99,6 @@ def change_selection_period() -> None:
             now -= 365 * delta
     period_combo['values'] = data
     period_combo.current(0)
-    # print(datetime)
-    # print(datetime.date.today())
-    # print(radio_period_state.get())
 
 
 # Возвращает название месяца
@@ -144,14 +126,54 @@ def get_first_day_of_quarter(date: datetime.datetime) -> datetime.datetime:
     return date + delta
 
 
+# Переводит индикатор в следующую позицию
+def next_load_indicator() -> None:
+    global loader_state
+    loader_canvas.itemconfigure(loader_data[loader_state], fill='orange')
+    loader_canvas.itemconfigure(loader_data[loader_state], outline='orange')
+    loader_state = (loader_state + 1) % config.NUMBER_OF_POINTS_IN_INDICATOR
+    loader_canvas.itemconfigure(loader_data[loader_state], fill='blue')
+    loader_canvas.itemconfigure(loader_data[loader_state], outline='blue')
+    tab2.update()
+
+
+def end_load_indicator() -> None:
+    for i in range(config.NUMBER_OF_POINTS_IN_INDICATOR):
+        loader_canvas.itemconfigure(loader_data[i], fill='green')
+        loader_canvas.itemconfigure(loader_data[i], outline='green')
+    tab2.update()
+
+
+def start_load_indicator() -> None:
+    global loader_data, loader_state
+    if not len(loader_data):
+        d = config.LOADER_PIXEL
+        for i in range(config.NUMBER_OF_POINTS_IN_INDICATOR):
+            loader_data.append(
+                loader_canvas.create_rectangle(d + 6 * d * i, d, 6 * d * i + 5 * d, 5 * d, fill="orange",
+                                               outline='orange'))
+    else:
+        for i in range(config.NUMBER_OF_POINTS_IN_INDICATOR):
+            loader_canvas.itemconfigure(loader_data[i], fill='orange')
+            loader_canvas.itemconfigure(loader_data[i], outline='orange')
+        loader_state = 0
+    loader_canvas.itemconfigure(loader_data[0], fill='blue')
+    loader_canvas.itemconfigure(loader_data[0], outline='blue')
+    loader_canvas.grid(column=4, row=4)
+    tab2.update()
+
+
 def draw_currency_graph() -> None:
-    # Очищаем и подготовляем график
+    # Очищаем и подготавливаем график
     plt.close()
     fig = plt.figure()
     canvas = matplotlib.backends.backend_tkagg.FigureCanvasTkAgg(fig, master=tab2)
     plot_widget = canvas.get_tk_widget()
     canvas.get_tk_widget()
     fig.clear()
+
+    # Включаем индикатор
+    start_load_indicator()
 
     # Получаем данные для построения
     now = datetime.datetime.now()
@@ -162,8 +184,8 @@ def draw_currency_graph() -> None:
     now_day = now.day
     num_of_points: int = 0
     labels: [str] = []
-    x = []
-    y = []
+    x: [float] = []
+    y: [float] = []
     if pr == 1:
         now -= (num_of_period + 1) * 7 * delta - delta
         num_of_points = 7
@@ -172,7 +194,7 @@ def draw_currency_graph() -> None:
             y.append(get_current_exchange_rate(date=now, num_code=currency_num_code))
             labels.append(str(now.strftime('%d.%m.%Y')) if not i % 2 else '')
             now += delta
-        print()
+            next_load_indicator()
     elif pr == 2:
         num_of_points = get_number_of_days_in_month(now)
         now -= (now.day - 1) * delta
@@ -181,14 +203,13 @@ def draw_currency_graph() -> None:
             num_of_points = get_number_of_days_in_month(now)
             now -= (num_of_points - 1) * delta
             now_day = num_of_points
-        # print(now_day)
         for i in range(num_of_points):
             if i < now_day or config.IGNORE_NON_COMING_DAYS:
                 x.append(i)
                 y.append(get_current_exchange_rate(date=now, num_code=currency_num_code))
             labels.append(str(now.day) if i < 9 or not i % 2 else '')
             now += delta
-        print()
+            next_load_indicator()
     elif pr == 3:
         now -= num_of_period * 3 * 30 * delta  # Попадаем в нужный квартал
         now = get_first_day_of_quarter(now)
@@ -202,6 +223,7 @@ def draw_currency_graph() -> None:
                     y.append(get_current_exchange_rate(date=now, num_code=currency_num_code))  # Курс
                     labels.append(
                         get_month_slug(now)[:3] if i == 0 else (str(now.day) if 5 < i < 28 and not i % 2 else ''))
+                    next_load_indicator()
                 now += delta
             num_of_points_l_t = num_of_points  # Для подcчета последующих координат
     elif pr == 4:
@@ -214,11 +236,13 @@ def draw_currency_graph() -> None:
                 date=date,
                 num_code=currency_num_code))  # Курс
             labels.append(get_month_slug(date)[:3] if not i % 2 else '')
+            next_load_indicator()
 
     plt.plot(x, y)
     plt.xticks(range(num_of_points), labels)
     plt.grid()
     plot_widget.grid(column=4, row=6)
+    end_load_indicator()
 
 
 if __name__ == '__main__':
@@ -239,10 +263,11 @@ if __name__ == '__main__':
     tab2 = ttk.Frame(tab_control)
 
     # Вкладки приложения
-
-    tab_control.add(tab2, text="Динамика курса")
     tab_control.add(tab1, text="Калькулятор валют")
-    # tab_control.enable_traversal()
+    tab_control.add(tab2, text="Динамика курса")
+
+    # Возможность переключаться через Ctrl + Tab
+    tab_control.enable_traversal()
 
     """
     Вкладка - Калькулятор валют
@@ -329,6 +354,11 @@ if __name__ == '__main__':
 
     # Настраиваем способ отрисовки графика
     matplotlib.use('TkAgg')
+
+    # Переменные для индикатора загрузки
+    loader_canvas = Canvas(tab2, width=150, height=30)
+    loader_data = []
+    loader_state = 0
 
     tab_control.pack(expand=1, fill='both')  # Открываем первую вкладку
     window.mainloop()

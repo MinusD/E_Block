@@ -23,3 +23,5 @@ NO_END_CURRENCY_SELECTED_ERROR = 'Не выбрана конечная валю�
 RANDOM_CURRENCY = True  # Выбирать ли в начале случайную валюту
 NUMBER_OF_PERIODS = 4
 IGNORE_NON_COMING_DAYS = False  # Если True, выводит даже те дни, которые не наступили
+LOADER_PIXEL = 5
+NUMBER_OF_POINTS_IN_INDICATOR = 5
