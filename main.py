@@ -88,11 +88,11 @@ def change_selection_period() -> None:
             now -= 7 * delta
     elif pr == 2:
         for i in range(config.NUMBER_OF_PERIODS):
-            data.append(config.MONTHS_SLUGS[now.month % 12 - 1] + ' ' + str(now.year))
+            data.append(get_month_slug(now) + ' ' + str(now.year))
             now -= 30 * delta
     elif pr == 3:
         for i in range(config.NUMBER_OF_PERIODS):
-            data.append(config.QUARTERS_SLUGS[(now.month - 1) // 3] + ' ' + str(now.year))
+            data.append(config.QUARTERS_SLUGS[get_current_quarter(now)] + ' ' + str(now.year))
             now -= 3 * 30 * delta
     elif pr == 4:
         for i in range(config.NUMBER_OF_PERIODS):
@@ -105,8 +105,28 @@ def change_selection_period() -> None:
     # print(radio_period_state.get())
 
 
+# Возвращает название месяца
+def get_month_slug(date: datetime.datetime) -> str:
+    return config.MONTHS_SLUGS[date.month % 12 - 1]
+
+
 def get_number_of_days_in_month(date: datetime.datetime) -> int:
     return monthrange(date.year, month=date.month)[1]
+
+
+# Возвращает номер квартала (0-3)
+def get_current_quarter(date: datetime.datetime) -> int:
+    return (date.month - 1) // 3
+
+
+# Возвращает первый день квартала
+def get_first_day_of_quarter(date: datetime.datetime) -> datetime.datetime:
+    delta = datetime.timedelta(days=1)  # Дельта
+    nq = cq = get_current_quarter(date)  # Получаем номер текущего квартала
+    while nq == cq:
+        date -= delta
+        nq = get_current_quarter(date)
+    return date + delta
 
 
 def draw_currency_graph() -> None:
@@ -123,11 +143,11 @@ def draw_currency_graph() -> None:
     pr = radio_period_state.get()
     num_of_period = period_combo.current()
     delta = datetime.timedelta(days=1)
+    now_day = now.day
     num_of_points: int = 0
     labels: [str] = []
     x = []
     y = []
-
     if pr == 1:
         now -= (num_of_period + 1) * 7 * delta - delta
         num_of_points = 7
@@ -144,12 +164,29 @@ def draw_currency_graph() -> None:
             now -= delta
             num_of_points = get_number_of_days_in_month(now)
             now -= (num_of_points - 1) * delta
+            now_day = num_of_points
+        # print(now_day)
         for i in range(num_of_points):
-            x.append(i)
-            y.append(get_current_exchange_rate(currency_combo_graf.get(), now))
-            # labels.append(str(now.day))
+            if i < now_day or config.IGNORE_NON_COMING_DAYS:
+                x.append(i)
+                y.append(get_current_exchange_rate(currency_combo_graf.get(), now))
             labels.append(str(now.day) if i < 9 or not i % 2 else '')
             now += delta
+        print()
+    elif pr == 3:
+        now -= num_of_period * 3 * 30 * delta  # Попадаем в нужный квартал
+        now = get_first_day_of_quarter(now)
+        num_of_points_l_t = 0
+        for j in range(3):
+            num_of_points_t = get_number_of_days_in_month(now)
+            for i in range(num_of_points_t):
+                if not i % 4:
+                    num_of_points += 1
+                    x.append(i // 4 + num_of_points_l_t)
+                    y.append(get_current_exchange_rate(currency_combo_graf.get(), now))  # Курс
+                    labels.append(get_month_slug(now) if i == 0 else (str(now.day) if 7 < i < 28 and not i % 2  else ''))
+                now += delta
+            num_of_points_l_t = num_of_points  # Для подcчета последующих координат
 
     plt.plot(x, y)
     plt.xticks(range(num_of_points), labels)
@@ -281,30 +318,8 @@ if __name__ == '__main__':
     draw_currency_graph_btn = Button(tab2, text="Построить график", command=draw_currency_graph)
     draw_currency_graph_btn.grid(column=1, row=3, padx=config.PADX, pady=config.PADY)
 
+    # Настраиваем способ отрисовки графика
     matplotlib.use('TkAgg')
-
-    # fig = plt.figure()
-    # canvas = matplotlib.backends.backend_tkagg.FigureCanvasTkAgg(fig, master=tab2)
-    # plot_widget = canvas.get_tk_widget()
-    # canvas.get_tk_widget()
-    # fig.clear()
-    # plt.plot([random.randint(0, 30) for i in range(10)],
-    #          [random.randint(0, 30) for i in range(10)])  # х и у - списки значений абсциссы и ординаты
-    # plt.grid()
-    # plot_widget.grid(column=4, row=6)
-
-    # combo = ttk.Combobox(tab1)  # Создание комбобокса на первой вкладке, можно добавить аргументы, например ширину
-    # combo["values"] = ["раз", "два", "три"]
-    # print(combo["values"].size())
-    # combo.grid(column=0, row=0)  # Размещение в окне, указана позиция, можно указать отступы
-
-    # txt = Entry(tab1)  # Текстовое поле для ввода
-    # btn = Button(tab1, text="Действие", command=clicked)  # Кнопка, действие реализуется в функции clicked
-    # lb1 = Label(tab1, text="123")  # Надпись
-    # lb1.grid(column=1, row=2)
-    # tab_control.add(tab1, txt)
-    # Все объекты должны размещаться функцией grid
-    # Существуют функции для программного получения значения текстового поля и изменения надписи
 
     tab_control.pack(expand=1, fill='both')  # Открытие первой вкладки
     window.mainloop()  # Запуск главного цикла обработки событий
