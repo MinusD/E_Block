@@ -206,8 +206,15 @@ def draw_currency_graph() -> None:
             num_of_points_l_t = num_of_points  # Для подcчета последующих координат
     elif pr == 4:
         now -= num_of_period * 365 * delta  # Попадаем в нужный год
+        num_of_points = 24
+        for i in range(num_of_points):
+            date = datetime.datetime(year=now.year, month=(i // 2 + 1), day=(1 if not i % 2 else 15))
+            x.append(i)
+            y.append(get_current_exchange_rate(
+                date=date,
+                num_code=currency_num_code))  # Курс
+            labels.append(get_month_slug(date)[:3] if not i % 2 else '')
 
-        pass
     plt.plot(x, y)
     plt.xticks(range(num_of_points), labels)
     plt.grid()
